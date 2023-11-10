@@ -1,0 +1,153 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PlatformPlayerAttack : MonoBehaviour
+{
+    PlatformPlayerControl playerCTRL;
+
+    public float meleeTime = 0.5f;
+    public float comboTime = 1.0f;
+    public int comboNumber = 1;
+    public bool canMelee;
+
+    public GameObject playerAttackSphere;
+    public GameObject playerCane;
+    public GameObject playerGun;
+
+    public Transform shotSpawn;
+    public Rigidbody smallShot;
+    public Rigidbody chargedShot;
+    public float shotSpeed = 3000f;
+    public bool canShoot;
+
+    public LayerMask aimColliderMask = new LayerMask();
+    public Transform debugTransform;
+    public Animator anim;
+
+    //-----------------Charging variables--------
+    public float chargeSpeed = 2f;
+    public float chargeTime = -1f;
+    public bool isCharging;
+    //public bool startCharging;
+
+    private void Awake()
+    {
+        playerCTRL = GetComponent<PlatformPlayerControl>();
+        playerAttackSphere.SetActive(false);
+        anim = GetComponentInChildren<Animator>();
+    }
+
+    void Start()
+    {
+        canShoot = true;
+        isCharging = false;
+        canMelee = true;
+        chargeTime = -1f;
+        playerCane.SetActive(false);
+        playerGun.SetActive(false);
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        comboTime -= Time.deltaTime;
+        if (comboTime < 0)
+        {
+            comboTime = 0;
+            comboNumber = 1;
+        }
+
+        anim.SetInteger("HitCount", comboNumber);
+        anim.SetBool("Melee", canMelee);
+        anim.SetFloat("ComboTime", comboTime);
+
+        if (playerCTRL.isZoomed) playerGun.SetActive(true);
+        else playerGun.SetActive(false);
+        
+        if(Input.GetButtonDown("Fire1"))
+        {
+            if(!playerCTRL.isZoomed && canMelee) StartCoroutine(PlayerMelee());
+            else if(playerCTRL.isZoomed && canShoot) StartCoroutine(PlayerShoot());     
+        }
+
+        if(Input.GetButton("Fire1") && chargeTime < 2f)
+        {
+            isCharging = true;
+            if (isCharging) chargeTime += Time.deltaTime * chargeSpeed;
+        }
+
+        if (Input.GetButtonUp("Fire1"))
+        {
+            if(chargeTime >= 2f) StartCoroutine(ChargedShot());
+            else
+            {
+                isCharging = false;
+                chargeTime = -1f;
+            }
+        }
+    
+
+        Vector2 screenCenterPoint = new Vector2(Screen.width / 2f, Screen.height / 2f);
+
+        Ray ray = Camera.main.ScreenPointToRay(screenCenterPoint);
+        if(Physics.Raycast(ray, out RaycastHit rayCastHit, 999f, aimColliderMask))
+        {
+            //debugTransform.position = rayCastHit.point;
+            shotSpawn.LookAt(rayCastHit.point);
+        }
+
+        
+    }
+
+    IEnumerator PlayerMelee()
+    {
+        
+        if (comboNumber == 1)
+        {
+            comboNumber = 2;
+            anim.SetTrigger("Attack 1");
+            comboTime = 1.25f;
+        }
+        else if (comboNumber == 2 && comboTime > 0)
+        {
+            comboNumber = 3;
+            anim.SetTrigger("Attack 2");
+            comboTime = 1.25f;
+        }
+        else if (comboNumber == 3 && comboTime > 0)
+        {
+            comboNumber = 1;
+            anim.SetTrigger("Attack 3");
+        }
+        canMelee = false;
+        playerAttackSphere.SetActive(true);
+        yield return new WaitForSeconds(meleeTime);
+        canMelee = true;
+        playerAttackSphere.SetActive(false);
+    }
+    IEnumerator PlayerShoot()
+    {
+        Rigidbody playerBullet;
+        playerBullet = Instantiate(smallShot, shotSpawn.position, shotSpawn.rotation) as Rigidbody;
+        playerBullet.AddForce(shotSpawn.forward * shotSpeed);
+        canShoot = false;
+        yield return new WaitForSeconds(0.2f);
+        canShoot = true;       
+    }
+
+    IEnumerator ChargedShot()
+    {
+        Rigidbody playerBullet;
+        playerBullet = Instantiate(chargedShot, shotSpawn.position, shotSpawn.rotation) as Rigidbody;
+        playerBullet.AddForce(shotSpawn.forward * shotSpeed);
+        canShoot = false;
+        isCharging = false;
+        chargeTime = -1;
+        yield return new WaitForSeconds(0.2f);
+        canShoot = true;
+        
+    }
+
+    
+}
